@@ -4,12 +4,18 @@ bench-all:
 	make bench-sonobe
 
 bench-nova:
-	cd nova && RUSTFLAGS="-C target-cpu=native" cargo bench minroot --release
+	cd nova && RUSTFLAGS="-C target-cpu=native" cargo bench --bench minroot --release
 
 bench-protostar:
-	cd protostar && RUSTFLAGS="-C target-cpu=native" cargo bench minroot --release --features nightly-features
+	bench-halo2lib_bctv
+	bench-halo2lib_cyclefold
 
+bench-halo2lib_bctv:
+	cd protostar && RUSTFLAGS="-C target-cpu=native" cargo bench --bench minroot --release --features nightly-features
+
+bench-halo2lib_cyclefold:
+	cd protostar && RUSTFLAGS="-C target-cpu=native" cargo bench --bench minroot --release --features nightly-features 
 
 bench-sonobe:
-	cd sonobe/sha2-chain && RUSTFLAGS="-C target-cpu=native" cargo bench minroot --release
+	cd sonobe/sha2-chain && RUSTFLAGS="-C target-cpu=native" cargo bench --bench minroot --release
 

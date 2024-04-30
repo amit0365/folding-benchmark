@@ -1,9 +1,11 @@
 use halo2_base::gates::circuit::BaseCircuitParams;
 use halo2_base::halo2_proofs::halo2curves::{bn256::{self, Bn256}, grumpkin};
 use plonkish_backend::accumulation::protostar::ivc::halo2::test::{run_protostar_hyperplonk_ivc_minroot_preprocess, run_protostar_hyperplonk_ivc_prove};
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion};
 use plonkish_backend::pcs::multilinear::{Gemini, MultilinearIpa};
 use plonkish_backend::pcs::univariate::UnivariateKzg;
+use std::fs::File;
+use std::io::Write;
 
 const NUM_VARS: usize = 19;
 
@@ -22,23 +24,35 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
             Gemini<UnivariateKzg<Bn256>>,
             MultilinearIpa<grumpkin::G1Affine>,
         >(NUM_VARS, circuit_params);
-        
-    let num_steps_values = vec![5, 10]; //, 100, 1000, 10000];
-    let mut group = c.benchmark_group("Gemini KZG IPA Protostar HyperPlonk IVC");
+
+    let num_steps_values = vec![5, 10, 20]; //, 100, 1000, 10000];
+    let mut group = c.benchmark_group("Halo2lib Protostar Bctv IVC");
 
     group.sample_size(10);
 
+    let mut results = Vec::new();
     for &num_steps in &num_steps_values {
-        let test_name = BenchmarkId::new("entire_process", num_steps);
-        
-        group.bench_with_input(test_name, &num_steps, |b, &num_steps| {
-            b.iter(|| {
-                run_protostar_hyperplonk_ivc_prove(primary_circuit.clone(), secondary_circuit.clone(), ivc_pp.clone(), ivc_vp.clone(), num_steps);
-            });
+        let test_name = format!("entire_process_{}", num_steps);
+        group.bench_function(&test_name, |b| {
+            b.iter_custom(|_iters| run_protostar_hyperplonk_ivc_prove(primary_circuit.clone(), secondary_circuit.clone(), ivc_pp.clone(), ivc_vp.clone(), num_steps))
         });
+
+        let exec_time = run_protostar_hyperplonk_ivc_prove(primary_circuit.clone(), secondary_circuit.clone(), ivc_pp.clone(), ivc_vp.clone(), num_steps);
+        results.push((num_steps, exec_time));
     }
 
     group.finish();
+
+    let mut file = File::create("../benchmark_results/halo2lib_minroot_protostar_bctv.md").expect("Failed to create file");
+    writeln!(file, "| Num Steps | Execution Time (ms) |").expect("Failed to write to file");
+    writeln!(file, "|-----------|---------------------|").expect("Failed to write to file");
+    for (num_steps, duration) in results {
+        writeln!(
+            file,
+            "| {}           | {:?} ms             |",
+            num_steps, duration.as_millis()
+        ).expect("Failed to write to file");
+    }
 }
 
 fn minroot_protostar_bctv(c: &mut Criterion) {

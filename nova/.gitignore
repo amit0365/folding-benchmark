@@ -6,4 +6,4 @@ benchmark_outputs/*
 .vscode
 
 Cargo.lock
-/target
+target
