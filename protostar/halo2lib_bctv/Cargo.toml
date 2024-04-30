@@ -1,0 +1,13 @@
+[package]
+name = "halo2lib_bctv"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+plonkish_backend = { git = "https://github.com/amit0365/plonkish.git" , branch = "halo2ecc-minroot"}
+halo2-base = { git = "https://github.com/amit0365/halo2-lib.git", package="halo2-base", branch = "protostar"}
+criterion = "0.4"
+
+[[bench]]
+name = "minroot"
+harness = false 

@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "halo2lib_bctv",
+    "halo2lib_cyclefold",
+]
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "fat"
+
