@@ -146,6 +146,7 @@ pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize,
 //   println!("Nova-based VDF with MinRoot delay function");
 //   println!("=========================================================");
 
+    let start = Instant::now();
     // produce non-deterministic advice
     let (z0_primary, minroot_iterations) = MinRootIteration::<<E1 as Engine>::GE>::new(
       num_iters_per_step * num_steps,
@@ -181,7 +182,6 @@ pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize,
       )
       .unwrap();
 
-    let start = Instant::now();
     for (i, circuit_primary) in minroot_circuits.iter().enumerate() {
       let res = recursive_snark.prove_step(&pp, circuit_primary, &circuit_secondary);
       assert!(res.is_ok());
