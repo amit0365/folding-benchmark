@@ -20,8 +20,8 @@ use nova_snark::{
   type S2 = nova_snark::spartan::snark::RelaxedR1CSSNARK<E2, EE2>; // non-preprocessing SNARK
   
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+fn bench_nova_ivc(c: &mut Criterion) {
 
-fn run_benchmark(num_steps: &usize) -> Duration {
     let num_iters_per_step = 1024;
     let circuit_primary = MinRootCircuit {
       seq: vec![
@@ -49,13 +49,7 @@ fn run_benchmark(num_steps: &usize) -> Duration {
     )
     .unwrap();
 
-    let start = Instant::now();
-    nova_ivc(*num_steps, num_iters_per_step, pp, circuit_secondary);
-    start.elapsed()
-}
-
-fn bench_nova_ivc(c: &mut Criterion) {
-    let num_steps_values = vec![5, 10, 20]; //, 100, 1000, 10000];
+    let num_steps_values = vec![5, 10, 20, 100, 1000];
     let mut group = c.benchmark_group("NOVA IVC");
 
     group.sample_size(10);
@@ -64,17 +58,15 @@ fn bench_nova_ivc(c: &mut Criterion) {
     for &num_steps in &num_steps_values {
         let test_name = format!("entire_process_{}", num_steps);
         group.bench_function(&test_name, |b| {
-            b.iter_custom(|_iters| run_benchmark(&num_steps))
+            b.iter_custom(|_iters| nova_ivc(num_steps, num_iters_per_step, pp.clone(), circuit_secondary.clone()))
         });
 
-        // Simulate capturing the execution time
-        let exec_time = run_benchmark(&num_steps);
+        let exec_time = nova_ivc(num_steps, num_iters_per_step, pp.clone(), circuit_secondary.clone());
         results.push((num_steps, exec_time));
     }
 
     group.finish();
 
-    // Output results as Markdown table
     let mut file = File::create("../benchmark_results/nova_minroot.md").expect("Failed to create file");
     writeln!(file, "| Num Steps | Execution Time (ms) |").expect("Failed to write to file");
     writeln!(file, "|-----------|---------------------|").expect("Failed to write to file");

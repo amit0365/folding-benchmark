@@ -14,7 +14,7 @@ use nova_snark::{
   CompressedSNARK, PublicParams, RecursiveSNARK,
 };
 use num_bigint::BigUint;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 type E1 = Bn256EngineKZG;
 type E2 = GrumpkinEngine;
@@ -139,7 +139,10 @@ impl<G: Group> StepCircuit<G::Scalar> for MinRootCircuit<G> {
 }
 
 /// cargo run --release --example minroot
-pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize, pp: PublicParams<E1, E2, MinRootCircuit<<E1 as Engine>::GE>, TrivialCircuit<<E2 as Engine>::Scalar>>, circuit_secondary: TrivialCircuit<<E2 as Engine>::Scalar>) {
+pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize, 
+  pp: PublicParams<E1, E2, MinRootCircuit<<E1 as Engine>::GE>, TrivialCircuit<<E2 as Engine>::Scalar>>, 
+  circuit_secondary: TrivialCircuit<<E2 as Engine>::Scalar>
+) -> Duration {
 //   println!("Nova-based VDF with MinRoot delay function");
 //   println!("=========================================================");
 
@@ -178,11 +181,13 @@ pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize, pp: PublicParams<E1
       )
       .unwrap();
 
+    let start = Instant::now();
     for (i, circuit_primary) in minroot_circuits.iter().enumerate() {
       let res = recursive_snark.prove_step(&pp, circuit_primary, &circuit_secondary);
       assert!(res.is_ok());
     }
-
+    start.elapsed()
+    
     // verify the recursive SNARK
     // println!("Verifying a RecursiveSNARK...");
     // let start = Instant::now();
