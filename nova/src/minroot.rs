@@ -138,13 +138,10 @@ impl<G: Group> StepCircuit<G::Scalar> for MinRootCircuit<G> {
   }
 }
 
-/// cargo run --release --example minroot
 pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize, 
   pp: PublicParams<E1, E2, MinRootCircuit<<E1 as Engine>::GE>, TrivialCircuit<<E2 as Engine>::Scalar>>, 
   circuit_secondary: TrivialCircuit<<E2 as Engine>::Scalar>
 ) -> Duration {
-//   println!("Nova-based VDF with MinRoot delay function");
-//   println!("=========================================================");
 
     let start = Instant::now();
     // produce non-deterministic advice
