@@ -49,7 +49,7 @@ fn bench_nova_ivc(c: &mut Criterion) {
     )
     .unwrap();
 
-    let num_steps_values = vec![5, 10, 20, 100, 1000];
+    let num_steps_values = vec![10, 20];
     let mut group = c.benchmark_group("NOVA IVC");
 
     group.sample_size(10);
@@ -68,13 +68,13 @@ fn bench_nova_ivc(c: &mut Criterion) {
     group.finish();
 
     let mut file = File::create("../benchmark_results/nova_minroot.md").expect("Failed to create file");
-    writeln!(file, "| Num Steps | Execution Time (ms) |").expect("Failed to write to file");
-    writeln!(file, "|-----------|---------------------|").expect("Failed to write to file");
+    writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
+    writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (num_steps, duration) in results {
         writeln!(
             file,
-            "| {}           | {:?} ms             |",
-            num_steps, duration.as_millis()
+            "| {}         | {}               | {:?} ms             | {:?}                | {:?}                  |",
+            num_steps, num_iters_per_step, duration.as_millis(), pp.num_constraints().0, pp.num_constraints().1
         ).expect("Failed to write to file");
     }
 }

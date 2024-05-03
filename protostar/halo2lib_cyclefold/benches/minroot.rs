@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Write;
 use halo2_base::gates::circuit::BaseCircuitParams;
@@ -24,14 +25,14 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
         lookup_bits: Some(1),
         num_instance_columns: 1,
     };
-    let (primary_circuit, secondary_circuit, ivc_pp, ivc_vp)
+    let (primary_circuit, secondary_circuit, ivc_pp, ivc_vp, primary_size, secondary_size)
         = run_protostar_hyperplonk_ivc_minroot_preprocess::<
             bn256::G1Affine,
             Gemini<UnivariateKzg<Bn256>>,
             MultilinearIpa<grumpkin::G1Affine>,
         >(primary_circuit_params, cyclefold_circuit_params);
 
-    let num_steps_values = vec![5, 10, 20]; //, 100, 1000, 10000];
+    let num_steps_values = vec![5, 10]; //, 100, 1000, 10000];
     let mut group = c.benchmark_group("Halo2lib Protostar Cyclefold IVC");
 
     group.sample_size(10);
@@ -48,22 +49,22 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
     }
 
     group.finish();
-
+    let num_iters_per_step = primary_circuit.circuit().step_circuit.clone().into_inner().num_iters_per_step;
     let mut file = File::create("../benchmark_results/halo2lib_minroot_protostar_cyclefold.md").expect("Failed to create file");
-    writeln!(file, "| Num Steps | Execution Time (ms) |").expect("Failed to write to file");
-    writeln!(file, "|-----------|--------------------|").expect("Failed to write to file");
+    writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
+    writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (num_steps, duration) in results {
         writeln!(
             file,
-            "| {}         | {:?} ms           |",
-            num_steps, duration.as_millis()
+            "| {}         | {}               | {:?} ms             | {:?}                | {:?}                  |",
+            num_steps, num_iters_per_step, duration.as_millis(), primary_size, secondary_size
         ).expect("Failed to write to file");
     }
 }
 
-fn minroot_protostar_bctv(c: &mut Criterion) {
+fn minroot_protostar_cyclefold(c: &mut Criterion) {
     bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c);
 }
 
-criterion_group!(benches, minroot_protostar_bctv);
+criterion_group!(benches, minroot_protostar_cyclefold);
 criterion_main!(benches);

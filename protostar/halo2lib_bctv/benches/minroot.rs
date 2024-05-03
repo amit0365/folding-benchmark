@@ -18,7 +18,7 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
         lookup_bits: Some(13),
         num_instance_columns: 1,
     };
-    let (primary_circuit, secondary_circuit, ivc_pp, ivc_vp)
+    let (primary_circuit, secondary_circuit, ivc_pp, ivc_vp, primary_size, secondary_size)
         = run_protostar_hyperplonk_ivc_minroot_preprocess::<
             bn256::G1Affine,
             Gemini<UnivariateKzg<Bn256>>,
@@ -43,14 +43,15 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
 
     group.finish();
 
-    let mut file = File::create("../benchmark_results/halo2lib_minroot_protostar_bctv.md").expect("Failed to create file");
-    writeln!(file, "| Num Steps | Execution Time (ms) |").expect("Failed to write to file");
-    writeln!(file, "|-----------|---------------------|").expect("Failed to write to file");
+    let num_iters_per_step = primary_circuit.circuit().step_circuit.clone().into_inner().num_iters_per_step;
+    let mut file = File::create("../benchmark_results/halo2lib_minroot_protostar_cyclefold.md").expect("Failed to create file");
+    writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
+    writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (num_steps, duration) in results {
         writeln!(
             file,
-            "| {}           | {:?} ms             |",
-            num_steps, duration.as_millis()
+            "| {}         | {}               | {:?} ms             | {:?}                | {:?}                  |",
+            num_steps, num_iters_per_step, duration.as_millis(), primary_size, secondary_size
         ).expect("Failed to write to file");
     }
 }
