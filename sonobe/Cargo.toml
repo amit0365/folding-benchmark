@@ -1,0 +1,29 @@
+[workspace]
+[package]
+name = "sonobe"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "fat"
+
+[dependencies]
+folding-schemes = { git = "https://github.com/privacy-scaling-explorations/sonobe" }
+ark-ec = "^0.4.0"
+ark-ff = "^0.4.0"
+ark-poly = "^0.4.0"
+ark-std = "^0.4.0"
+ark-crypto-primitives = { version = "^0.4.0", default-features = false, features = ["r1cs", "sponge", "crh"] }
+ark-poly-commit = "^0.4.0"
+ark-relations = { version = "^0.4.0", default-features = false }
+ark-r1cs-std = { version = "0.4.0", default-features = false } # this is patched at the workspace level
+flate2 = "1.0"
+num-bigint = "0.4.3"
+bincode = "1.3.3"
+criterion = "0.4"
+
+[[bench]]
+name = "minroot"
+harness = false 
