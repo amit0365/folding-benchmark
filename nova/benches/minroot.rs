@@ -2,15 +2,14 @@ use nova::minroot::{nova_ivc, MinRootCircuit, MinRootIteration};
 use nova_snark::{
     provider::{Bn256EngineKZG, GrumpkinEngine},
     traits::{
-      circuit::{StepCircuit, TrivialCircuit},
+      circuit::TrivialCircuit,
       snark::RelaxedR1CSSNARKTrait,
-      Engine, Group,
+      Engine, 
     },
-    CompressedSNARK, PublicParams, RecursiveSNARK,
+    PublicParams,
   };
-  use num_bigint::BigUint;
-  use std::{fs::File, time::{Duration, Instant}};
-  use std::io::{Write, Result};
+  use std::fs::File;
+  use std::io::Write;
 
   type E1 = Bn256EngineKZG;
   type E2 = GrumpkinEngine;

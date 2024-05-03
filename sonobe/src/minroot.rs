@@ -2,14 +2,8 @@
 //! iterations of the `MinRoot` function, thereby realizing a Nova-based verifiable delay function (VDF).
 //! We execute a configurable number of iterations of the `MinRoot` function per step of Nova's recursion.
 
-use ark_bn254::{constraints::GVar, Bn254, Fr, G1Projective as G1};
 use ark_r1cs_std::prelude::AllocationMode;
-use ark_crypto_primitives::snark::SNARK;
 use ark_ff::PrimeField;
-use ark_groth16::VerifyingKey as G16VerifierKey;
-use ark_groth16::{Groth16, ProvingKey};
-use ark_grumpkin::{constraints::GVar as GVar2, Projective as G2};
-use ark_poly_commit::kzg10::VerifierKey as KZGVerifierKey;
 use ark_r1cs_std::alloc::AllocVar;
 use ark_r1cs_std::fields::fp::FpVar;
 use ark_r1cs_std::fields::FieldVar;
@@ -17,24 +11,10 @@ use ark_r1cs_std::boolean::Boolean;
 use ark_r1cs_std::eq::EqGadget;
 use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
 use num_bigint::BigUint;
-use ark_std::Zero;
-use std::marker::PhantomData;
-use std::time::Instant;
 
 use folding_schemes::{
-    commitment::{
-        kzg::{ProverKey as KZGProverKey, KZG},
-        pedersen::Pedersen,
-        CommitmentScheme,
-    },
-    folding::nova::{
-        decider_eth::{prepare_calldata, Decider as DeciderEth},
-        decider_eth_circuit::DeciderEthCircuit,
-        get_cs_params_len, Nova, ProverParams,
-    },
     frontend::FCircuit,
-    transcript::poseidon::poseidon_test_config,
-    Decider, Error, FoldingScheme,
+    Error,
 };
 
 
@@ -96,22 +76,79 @@ impl<F: PrimeField> MinRootIteration<F> {
 
 #[derive(Clone, Debug)]
 pub struct MinRootCircuit<F: PrimeField> {
+  pub num_iters_per_step: usize,
+  input: Vec<F>,
   pub seq: Vec<MinRootIteration<F>>,
+}
+
+impl<F: PrimeField> MinRootCircuit<F> {
+    pub fn new(initial_input: Vec<F>, num_iters_per_step: usize) -> Self {
+        let (_output, seq) = 
+            MinRootIteration::new(num_iters_per_step, &initial_input[0], &initial_input[1]);
+
+        Self { 
+            num_iters_per_step,
+            input: initial_input.clone(),
+            seq, 
+        }
+    }
 }
 
 impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
 
-  type Params = ();
-  fn new(_params: Self::Params) -> Self {
-      Self { seq: Vec::new() }
+  type Params = (Vec<F>, usize); // initial input and number of iterations per step
+  
+  fn new(params: Self::Params) -> Self {
+    let (_output, seq) = 
+    MinRootIteration::new(params.1, &params.0[0], &params.0[1]);
+
+    Self { 
+        num_iters_per_step: params.1,
+        input: params.0.clone(),
+        seq, 
+    }
   }
 
   fn state_len(&self) -> usize {
-      1
+      2
   }
 
-  fn step_native(&self, _i: usize, z_i: Vec<F>) -> Result<Vec<F>, Error> {
-      Ok(vec![z_i[0] * z_i[0] * z_i[0] + z_i[0] + F::from(5_u32)])
+  fn step_native(&mut self, _i: usize, _z_i: Vec<F>) -> Result<Vec<F>, Error> {
+        // produces a sample non-deterministic advice, executing one invocation of MinRoot per step
+        let (_output, seq) = 
+        MinRootIteration::new(self.num_iters_per_step, &self.input[0], &self.input[1]);
+  
+        self.seq = seq;
+  
+        // use the provided inputs
+        let x_0 = self.input[0];
+        let y_0 = self.input[1];
+        let mut z_out: Vec<F> = Vec::new();
+  
+        // variables to hold running x_i and y_i
+        let mut x_i = x_0;
+        let mut y_i = y_0;
+        for i in 0..self.seq.len() {
+        // non deterministic advice
+        let x_i_plus_1 = self.seq[i].x_i_plus_1;
+  
+        // check the following conditions hold:
+        // (i) x_i_plus_1 = (x_i + y_i)^{1/5}, which can be more easily checked with x_i_plus_1^5 = x_i + y_i
+        // (ii) y_i_plus_1 = x_i
+        let x_i_plus_1_sq = x_i_plus_1 * x_i_plus_1;
+        let x_i_plus_1_quad = x_i_plus_1_sq * x_i_plus_1_sq;
+        assert_eq!(x_i_plus_1_quad * x_i_plus_1, x_i + y_i);
+
+        if i == self.seq.len() - 1 {
+            z_out = vec![x_i_plus_1, x_i];
+        }
+  
+            // update x_i and y_i for the next iteration
+            y_i = x_i;
+            x_i = x_i_plus_1;
+        }
+  
+      Ok(z_out)
   }
 
   fn generate_step_constraints(
@@ -160,49 +197,3 @@ impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
     z_out
   }
 }
-
-// pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize, pp: PublicParams<E1, E2, MinRootCircuit<<E1 as Engine>::GE>, TrivialCircuit<<E2 as Engine>::Scalar>>, circuit_secondary: TrivialCircuit<<E2 as Engine>::Scalar>) {
-//   println!("Nova-based VDF with MinRoot delay function");
-//   println!("=========================================================");
-
-    // produce non-deterministic advice
-    // let (z0_primary, minroot_iterations) = MinRootIteration::<<E1 as Engine>::GE>::new(
-    //   num_iters_per_step * num_steps,
-    //   &<E1 as Engine>::Scalar::zero(),
-    //   &<E1 as Engine>::Scalar::one(),
-    // );
-    // let minroot_circuits = (0..num_steps)
-    //   .map(|i| MinRootCircuit {
-    //     seq: (0..num_iters_per_step)
-    //       .map(|j| MinRootIteration {
-    //         x_i: minroot_iterations[i * num_iters_per_step + j].x_i,
-    //         y_i: minroot_iterations[i * num_iters_per_step + j].y_i,
-    //         x_i_plus_1: minroot_iterations[i * num_iters_per_step + j].x_i_plus_1,
-    //         y_i_plus_1: minroot_iterations[i * num_iters_per_step + j].y_i_plus_1,
-    //       })
-    //       .collect::<Vec<_>>(),
-    //   })
-    //   .collect::<Vec<_>>();
-
-    // let z0_secondary = vec![<E2 as Engine>::Scalar::zero()];
-
-    // type C1 = MinRootCircuit<<E1 as Engine>::GE>;
-    // type C2 = TrivialCircuit<<E2 as Engine>::Scalar>;
-    // // produce a recursive SNARK
-    // // println!("Generating a RecursiveSNARK...");
-    // let mut recursive_snark: RecursiveSNARK<E1, E2, C1, C2> =
-    //   RecursiveSNARK::<E1, E2, C1, C2>::new(
-    //     &pp,
-    //     &minroot_circuits[0],
-    //     &circuit_secondary,
-    //     &z0_primary,
-    //     &z0_secondary,
-    //   )
-    //   .unwrap();
-
-    // for (i, circuit_primary) in minroot_circuits.iter().enumerate() {
-    //   let res = recursive_snark.prove_step(&pp, circuit_primary, &circuit_secondary);
-    //   assert!(res.is_ok());
-    // }
-
-//}

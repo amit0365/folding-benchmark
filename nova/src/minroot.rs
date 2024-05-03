@@ -3,25 +3,19 @@
 //! We execute a configurable number of iterations of the `MinRoot` function per step of Nova's recursion.
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
 use ff::Field;
-use flate2::{write::ZlibEncoder, Compression};
 use nova_snark::{
   provider::{Bn256EngineKZG, GrumpkinEngine},
   traits::{
     circuit::{StepCircuit, TrivialCircuit},
-    snark::RelaxedR1CSSNARKTrait,
     Engine, Group,
   },
-  CompressedSNARK, PublicParams, RecursiveSNARK,
+  PublicParams, RecursiveSNARK,
 };
 use num_bigint::BigUint;
 use std::time::{Duration, Instant};
 
 type E1 = Bn256EngineKZG;
 type E2 = GrumpkinEngine;
-type EE1 = nova_snark::provider::hyperkzg::EvaluationEngine<E1>;
-type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<E2>;
-type S1 = nova_snark::spartan::snark::RelaxedR1CSSNARK<E1, EE1>; // non-preprocessing SNARK
-type S2 = nova_snark::spartan::snark::RelaxedR1CSSNARK<E2, EE2>; // non-preprocessing SNARK
 
 #[derive(Clone, Debug)]
 pub struct MinRootIteration<G: Group> {
@@ -179,55 +173,9 @@ pub fn nova_ivc(num_steps: usize, num_iters_per_step: usize,
       )
       .unwrap();
 
-    for (i, circuit_primary) in minroot_circuits.iter().enumerate() {
+    for (_i, circuit_primary) in minroot_circuits.iter().enumerate() {
       let res = recursive_snark.prove_step(&pp, circuit_primary, &circuit_secondary);
       assert!(res.is_ok());
     }
     start.elapsed()
-    
-    // verify the recursive SNARK
-    // println!("Verifying a RecursiveSNARK...");
-    // let start = Instant::now();
-    // let res = recursive_snark.verify(&pp, num_steps, &z0_primary, &z0_secondary);
-    // // println!(
-    // //   "RecursiveSNARK::verify: {:?}, took {:?}",
-    // //   res.is_ok(),
-    // //   start.elapsed()
-    // // );
-    // assert!(res.is_ok());
-
-    // // produce a compressed SNARK
-    // // println!("Generating a CompressedSNARK using Spartan with HyperKZG...");
-    // let (pk, vk) = CompressedSNARK::<_, _, _, _, S1, S2>::setup(&pp).unwrap();
-
-    // let start = Instant::now();
-
-    // let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &pk, &recursive_snark);
-    // // println!(
-    // //   "CompressedSNARK::prove: {:?}, took {:?}",
-    // //   res.is_ok(),
-    // //   start.elapsed()
-    // // );
-    // assert!(res.is_ok());
-    // let compressed_snark = res.unwrap();
-
-    // let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    // bincode::serialize_into(&mut encoder, &compressed_snark).unwrap();
-    // let compressed_snark_encoded = encoder.finish().unwrap();
-    // // println!(
-    // //   "CompressedSNARK::len {:?} bytes",
-    // //   compressed_snark_encoded.len()
-    // // );
-
-    // // verify the compressed SNARK
-    // // println!("Verifying a CompressedSNARK...");
-    // let start = Instant::now();
-    // let res = compressed_snark.verify(&vk, num_steps, &z0_primary, &z0_secondary);
-    // // println!(
-    // //   "CompressedSNARK::verify: {:?}, took {:?}",
-    // //   res.is_ok(),
-    // //   start.elapsed()
-    // // );
-    // assert!(res.is_ok());
-    // println!("=========================================================");
 }
