@@ -2,39 +2,57 @@
 //! iterations of the `MinRoot` function, thereby realizing a Nova-based verifiable delay function (VDF).
 //! We execute a configurable number of iterations of the `MinRoot` function per step of Nova's recursion.
 
-use ark_ec::{CurveGroup, Group};
+use ark_bn254::{constraints::GVar, Bn254, Fr, G1Projective as G1};
+use ark_r1cs_std::prelude::AllocationMode;
+use ark_crypto_primitives::snark::SNARK;
 use ark_ff::PrimeField;
-use ark_r1cs_std::alloc::{AllocVar, AllocationMode};
-use ark_r1cs_std::fields::fp::{AllocatedFp, FpVar};
+use ark_groth16::VerifyingKey as G16VerifierKey;
+use ark_groth16::{Groth16, ProvingKey};
+use ark_grumpkin::{constraints::GVar as GVar2, Projective as G2};
+use ark_poly_commit::kzg10::VerifierKey as KZGVerifierKey;
+use ark_r1cs_std::alloc::AllocVar;
+use ark_r1cs_std::fields::fp::FpVar;
 use ark_r1cs_std::fields::FieldVar;
-use ark_r1cs_std::R1CSVar;
-use ark_relations::lc;
+use ark_r1cs_std::boolean::Boolean;
+use ark_r1cs_std::eq::EqGadget;
 use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
-use core::marker::PhantomData;
-use std::time::Instant;
 use num_bigint::BigUint;
+use ark_std::Zero;
+use std::marker::PhantomData;
+use std::time::Instant;
 
-use folding_schemes::commitment::pedersen::Pedersen;
-use folding_schemes::folding::nova::Nova;
-use folding_schemes::frontend::FCircuit;
-use folding_schemes::{Error, FoldingScheme};
+use folding_schemes::{
+    commitment::{
+        kzg::{ProverKey as KZGProverKey, KZG},
+        pedersen::Pedersen,
+        CommitmentScheme,
+    },
+    folding::nova::{
+        decider_eth::{prepare_calldata, Decider as DeciderEth},
+        decider_eth_circuit::DeciderEthCircuit,
+        get_cs_params_len, Nova, ProverParams,
+    },
+    frontend::FCircuit,
+    transcript::poseidon::poseidon_test_config,
+    Decider, Error, FoldingScheme,
+};
 
 
 #[derive(Clone, Debug)]
-pub struct MinRootIteration<G: Group> {
-  pub x_i: G::ScalarField,
-  pub y_i: G::ScalarField,
-  pub x_i_plus_1: G::ScalarField,
-  pub y_i_plus_1: G::ScalarField,
+pub struct MinRootIteration<F: PrimeField> {
+  pub x_i: F,
+  pub y_i: F,
+  pub x_i_plus_1: F,
+  pub y_i_plus_1: F,
 }
 
-impl<G: Group> MinRootIteration<G> {
+impl<F: PrimeField> MinRootIteration<F> {
   // produces a sample non-deterministic advice, executing one invocation of MinRoot per step
-  fn new(num_iters: usize, x_0: &G::ScalarField, y_0: &G::ScalarField) -> (Vec<G::ScalarField>, Vec<Self>) {
+  fn new(num_iters: usize, x_0: &F, y_0: &F) -> (Vec<F>, Vec<Self>) {
     // exp = (p - 3 / 5), where p is the order of the group
     // x^{exp} mod p provides the fifth root of x
     let exp = {
-      let p = G::group_params().2.to_biguint().unwrap();
+      let p: BigUint = F::MODULUS.into(); //G::group_params().2.to_biguint().unwrap();
       let two = BigUint::parse_bytes(b"2", 10).unwrap();
       let three = BigUint::parse_bytes(b"3", 10).unwrap();
       let five = BigUint::parse_bytes(b"5", 10).unwrap();
@@ -77,11 +95,11 @@ impl<G: Group> MinRootIteration<G> {
 
 
 #[derive(Clone, Debug)]
-pub struct MinRootCircuit<G: Group> {
-  pub seq: Vec<MinRootIteration<G>>,
+pub struct MinRootCircuit<F: PrimeField> {
+  pub seq: Vec<MinRootIteration<F>>,
 }
 
-impl<G: Group> FCircuit<G::ScalarField> for MinRootCircuit<G> {
+impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
 
   type Params = ();
   fn new(_params: Self::Params) -> Self {
@@ -92,18 +110,18 @@ impl<G: Group> FCircuit<G::ScalarField> for MinRootCircuit<G> {
       1
   }
 
-  fn step_native(&self, _i: usize, z_i: Vec<G::ScalarField>) -> Result<Vec<G::ScalarField>, Error> {
-      Ok(vec![z_i[0] * z_i[0] * z_i[0] + z_i[0] + G::ScalarField::from(5_u32)])
+  fn step_native(&self, _i: usize, z_i: Vec<F>) -> Result<Vec<F>, Error> {
+      Ok(vec![z_i[0] * z_i[0] * z_i[0] + z_i[0] + F::from(5_u32)])
   }
 
   fn generate_step_constraints(
       &self,
-      cs: ConstraintSystemRef<G::ScalarField>,
+      cs: ConstraintSystemRef<F>,
       _i: usize,
-      z_i: Vec<FpVar<G::ScalarField>>,
-  ) -> Result<Vec<FpVar<G::ScalarField>>, SynthesisError> {
-      let five = FpVar::<G::ScalarField>::new_constant(cs.clone(), G::ScalarField::from(5u32))?;
-      let mut z_out: Result<Vec<FpVar<G::ScalarField>>, SynthesisError> =
+      z_i: Vec<FpVar<F>>,
+  ) -> Result<Vec<FpVar<F>>, SynthesisError> {
+      
+    let mut z_out: Result<Vec<FpVar<F>>, SynthesisError> =
       Err(SynthesisError::AssignmentMissing);
 
     // use the provided inputs
@@ -126,6 +144,9 @@ impl<G: Group> FCircuit<G::ScalarField> for MinRootCircuit<G> {
       let x_i_plus_1_sq = x_i_plus_1.square()?;
       let x_i_plus_1_quad =
         x_i_plus_1_sq.square()?;
+
+      let x_i_plus_1_fifth: FpVar::<F> = x_i_plus_1_quad * x_i_plus_1.clone();
+      x_i_plus_1_fifth.conditional_enforce_equal(&(&x_i + &y_i), &Boolean::<F>::TRUE)?;
 
       if i == self.seq.len() - 1 {
         z_out = Ok(vec![x_i_plus_1.clone(), x_i.clone()]);

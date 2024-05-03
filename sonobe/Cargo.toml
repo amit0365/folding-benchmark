@@ -1,4 +1,3 @@
-[workspace]
 [package]
 name = "sonobe"
 version = "0.1.0"
@@ -10,19 +9,29 @@ codegen-units = 1
 lto = "fat"
 
 [dependencies]
-folding-schemes = { git = "https://github.com/privacy-scaling-explorations/sonobe" }
+folding-schemes = { git = "https://github.com/amit0365/sonobe" }
 ark-ec = "^0.4.0"
 ark-ff = "^0.4.0"
 ark-poly = "^0.4.0"
+ark-bn254 = { git = "https://github.com/arnaucube/ark-curves-cherry-picked", branch="cherry-pick", features=["r1cs"]}
+ark-grumpkin = { git = "https://github.com/arnaucube/ark-curves-cherry-picked", branch="cherry-pick", features=["r1cs"]}
 ark-std = "^0.4.0"
 ark-crypto-primitives = { version = "^0.4.0", default-features = false, features = ["r1cs", "sponge", "crh"] }
 ark-poly-commit = "^0.4.0"
 ark-relations = { version = "^0.4.0", default-features = false }
 ark-r1cs-std = { version = "0.4.0", default-features = false } # this is patched at the workspace level
+ark-groth16 = { version = "^0.4.0" }
 flate2 = "1.0"
 num-bigint = "0.4.3"
 bincode = "1.3.3"
 criterion = "0.4"
+ark-pallas = {version="0.4.0", features=["r1cs"]}
+ark-vesta = {version="0.4.0", features=["r1cs"]}
+
+[dev-dependencies]
+rand = "0.8.5"
+tracing = { version = "0.1", default-features = false, features = [ "attributes" ] }
+tracing-subscriber = { version = "0.2" }
 
 [[bench]]
 name = "minroot"
