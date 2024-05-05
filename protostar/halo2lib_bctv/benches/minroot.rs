@@ -25,7 +25,7 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
             MultilinearIpa<grumpkin::G1Affine>,
         >(NUM_VARS, circuit_params);
 
-    let num_steps_values = vec![5, 10, 20]; //, 100, 1000, 10000];
+    let num_steps_values = vec![10, 20]; //, 100, 1000, 10000];
     let mut group = c.benchmark_group("Halo2lib Protostar Bctv IVC");
 
     group.sample_size(10);
@@ -44,7 +44,7 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
     group.finish();
 
     let num_iters_per_step = primary_circuit.circuit().step_circuit.clone().into_inner().num_iters_per_step;
-    let mut file = File::create("../benchmark_results/halo2lib_minroot_protostar_cyclefold.md").expect("Failed to create file");
+    let mut file = File::create("../../benchmark_results/halo2lib_minroot_protostar_bctv.md").expect("Failed to create file");
     writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
     writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (num_steps, duration) in results {

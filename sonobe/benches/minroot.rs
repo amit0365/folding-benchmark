@@ -12,7 +12,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 fn bench_nova_ivc(c: &mut Criterion) {
   let num_iters_per_step = 1024;
-  let initial_state = vec![Fr::from(0_u32), Fr::from(0_u32)];
+  let initial_state = vec![Fr::from(0_u32), Fr::from(1_u32)];
 
   let circuit_primary = MinRootCircuit::<Fr>::new(vec![Fr::from(0_u32), Fr::from(1_u32)], 1024);
     

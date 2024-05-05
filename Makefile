@@ -17,5 +17,5 @@ bench-halo2lib_cyclefold:
 	cd protostar && RUSTFLAGS="-C target-cpu=native" cargo bench --bench minroot  
 
 bench-sonobe:
-	cd sonobe/sha2-chain && RUSTFLAGS="-C target-cpu=native" cargo bench --bench minroot
+	cd sonobe && RUSTFLAGS="-C target-cpu=native" cargo bench --bench minroot
 
