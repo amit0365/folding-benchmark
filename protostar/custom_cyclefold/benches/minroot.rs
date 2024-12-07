@@ -15,7 +15,7 @@ use plonkish_backend::pcs::PolynomialCommitmentScheme;
 
 fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
     let num_steps = 10;
-    let num_iters_steps = vec![1024, 2048, 4096, 8192, 16384, 32768, 65535];
+    let num_iters_steps = vec![1024, 2048, 4096, 8192, 16384];
     let (mut primary_circuits, mut secondary_circuits, mut pp_vec, mut vp_vec) 
         = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     
@@ -68,7 +68,7 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
 
     group.finish();
 
-    let mut file = File::create("../benchmark_results/halo2_minroot_custom_cyclefold.md").expect("Failed to create file");
+    let mut file = File::create("../../benchmark_results/halo2_minroot_custom_cyclefold.md").expect("Failed to create file");
     writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
     writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (i, (num_iters, duration)) in results.iter().enumerate() {
