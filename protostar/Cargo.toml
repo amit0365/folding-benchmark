@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "custom_cyclefold",
     "halo2lib_bctv",
     "halo2lib_cyclefold",
 ]

@@ -10,40 +10,44 @@ use ark_pallas::{constraints::GVar, Fr, Projective};
 use ark_vesta::{constraints::GVar as GVar2, Projective as Projective2};
 use criterion::{criterion_group, criterion_main, Criterion};
 
+type NOVA = Nova<
+    Projective,
+    GVar,
+    Projective2,
+    GVar2,
+    MinRootCircuit<Fr>,
+    Pedersen<Projective>,
+    Pedersen<Projective2>,
+    >;
+
 fn bench_nova_ivc(c: &mut Criterion) {
-  let num_iters_per_step = 1024;
-  let initial_state = vec![Fr::from(0_u32), Fr::from(1_u32)];
+    let mut primary_circuits = Vec::new();
+    let mut pp_vec = Vec::new();
+    let initial_state = vec![Fr::from(0_u32), Fr::from(0_u32), Fr::from(1_u32)];
+    let num_iters_per_step = vec![1024, 2048, 4096, 8192];
+    for num_iters in &num_iters_per_step {
+        let circuit_primary = MinRootCircuit::<Fr>::new(vec![Fr::from(0_u32), Fr::from(0_u32), Fr::from(1_u32)], *num_iters);
+        let (prover_params, _verifier_params) =
+        test_nova_setup::<MinRootCircuit<Fr>>(circuit_primary.clone());
+        primary_circuits.push(circuit_primary);
+        pp_vec.push(prover_params);
+    }
 
-  let circuit_primary = MinRootCircuit::<Fr>::new(vec![Fr::from(0_u32), Fr::from(1_u32)], 1024);
-    
-    type NOVA = Nova<
-      Projective,
-      GVar,
-      Projective2,
-      GVar2,
-      MinRootCircuit<Fr>,
-      Pedersen<Projective>,
-      Pedersen<Projective2>,
-  >;
-
-    let (prover_params, _verifier_params) =
-     test_nova_setup::<MinRootCircuit<Fr>>(circuit_primary.clone());
-
-    let mut folding_scheme = NOVA::init(&prover_params, circuit_primary, initial_state.clone()).unwrap();
-
-    let num_steps_values = vec![10, 20];
+    let num_steps = 10;
     let mut group = c.benchmark_group("NOVA IVC");
 
     group.sample_size(10);
 
+    let mut folding_scheme_vec = Vec::new();
     let mut results = Vec::new();
-    for &num_steps in &num_steps_values {
-        let test_name = format!("entire_process_{}", num_steps);
+    for (i, num_iters) in num_iters_per_step.iter().enumerate() {
+        folding_scheme_vec.push(NOVA::init(&pp_vec[i], primary_circuits[i].clone(), initial_state.clone()).unwrap());
+        let test_name = format!("entire_process_{}", num_iters);
         group.bench_function(&test_name, |b| {
             b.iter_custom(|_iters| {
               let start = Instant::now();
               for _i in 0..num_steps {
-                folding_scheme.0.prove_step().unwrap();
+                folding_scheme_vec[i].0.prove_step().unwrap();
             }
               start.elapsed()
             })
@@ -53,11 +57,11 @@ fn bench_nova_ivc(c: &mut Criterion) {
         {
             let start = Instant::now();
             for _i in 0..num_steps {
-                folding_scheme.0.prove_step().unwrap();
+                folding_scheme_vec[i].0.prove_step().unwrap();
             }
             start.elapsed()
         };
-        results.push((num_steps, exec_time));
+        results.push((num_iters, exec_time));
     }
 
     group.finish();
@@ -65,11 +69,11 @@ fn bench_nova_ivc(c: &mut Criterion) {
     let mut file = File::create("../benchmark_results/sonobe_nova_minroot.md").expect("Failed to create file");
     writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
     writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
-    for (num_steps, duration) in results {
+    for (i, (num_iters, duration)) in results.iter().enumerate() {
         writeln!(
             file,
             "| {}         | {}               | {:?} ms             | {:?}                | {:?}                  |",
-            num_steps, num_iters_per_step, duration.as_millis(), folding_scheme.1, folding_scheme.2 
+            num_steps, num_iters, duration.as_millis(), folding_scheme_vec[i].1, folding_scheme_vec[i].2
         ).expect("Failed to write to file");
     }
 }

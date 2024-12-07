@@ -1,4 +1,4 @@
-use nova::minroot::{nova_ivc, MinRootCircuit, MinRootIteration};
+use nova::scalar_mul::{nova_ivc, ScalarMulChainCircuit};
 use nova_snark::{
     provider::{Bn256EngineKZG, GrumpkinEngine},
     traits::{
@@ -23,27 +23,15 @@ fn bench_nova_ivc(c: &mut Criterion) {
     let mut primary_circuits = Vec::new();
     let mut secondary_circuits = Vec::new();
     let mut pp_vec = Vec::new();
-    let num_iters_per_step = vec![1024, 2048, 4096, 8192, 16384, 32768, 65535];
-    for num_iters in &num_iters_per_step {
-      let circuit_primary = MinRootCircuit {
-          seq: vec![
-        MinRootIteration {
-          i: <E1 as Engine>::Scalar::zero(),
-          x_i: <E1 as Engine>::Scalar::zero(),
-          y_i: <E1 as Engine>::Scalar::zero(),
-          i_plus_1: <E1 as Engine>::Scalar::zero(),
-          x_i_plus_1: <E1 as Engine>::Scalar::zero(),
-          y_i_plus_1: <E1 as Engine>::Scalar::zero(),
-            };
-            *num_iters
-          ],
-        };
-
+    let num_steps = 10;
+    let num_sm_per_step = vec![64, 128, 256, 512, 1024];
+    for num_sm_per_step in &num_sm_per_step {
+      let circuit_primary = ScalarMulChainCircuit::new(*num_sm_per_step);
       let circuit_secondary = TrivialCircuit::default();
       let pp = PublicParams::<
         E1,
         E2,
-        MinRootCircuit<<E1 as Engine>::GE>,
+        ScalarMulChainCircuit,
         TrivialCircuit<<E2 as Engine>::Scalar>,
       >::setup(
       &circuit_primary,
@@ -58,24 +46,23 @@ fn bench_nova_ivc(c: &mut Criterion) {
       secondary_circuits.push(circuit_secondary);
     }
 
-    let num_steps = 10;
     let mut group = c.benchmark_group("NOVA IVC");
 
     group.sample_size(10);
 
     let mut results = Vec::new();
-    for (i, num_iters) in num_iters_per_step.iter().enumerate() {
+    for (i, num_sm_per_step) in num_sm_per_step.iter().enumerate() {
       let mut time = HashMap::new();
-        let test_name = format!("entire_process_{}", num_iters);
-        let benchmark_id = BenchmarkId::new(test_name, num_iters);
+        let test_name = format!("entire_process_{}", num_sm_per_step);
+        let benchmark_id = BenchmarkId::new(test_name, num_sm_per_step);  
         group.bench_function(benchmark_id, |b| {
           b.iter_custom(|iters| {
               let start = Instant::now();
               for _ in 0..iters {
-                  black_box(nova_ivc(num_steps, *num_iters, pp_vec[i].clone(), secondary_circuits[i].clone()));
+                  black_box(nova_ivc(num_steps, *num_sm_per_step, pp_vec[i].clone(), secondary_circuits[i].clone()));
               }
               let elapsed = start.elapsed();
-              let _ = *time.entry(*num_iters)
+              let _ = *time.entry(*num_sm_per_step)
                   .and_modify(|e| *e += elapsed)
                   .or_insert(elapsed);
               elapsed
@@ -83,14 +70,14 @@ fn bench_nova_ivc(c: &mut Criterion) {
       });
 
       let iterations = 10; // Replace this with the actual iteration count used in iter_custom.
-      let total_duration = time.entry(*num_iters).or_insert(Duration::ZERO).as_millis();
+      let total_duration = time.entry(*num_sm_per_step).or_insert(Duration::ZERO).as_millis();
       let average_execution_time = total_duration / iterations;
-      results.push((*num_iters, average_execution_time));
+      results.push((*num_sm_per_step, average_execution_time));
     }
 
     group.finish();
 
-    let mut file = File::create("../benchmark_results/nova_minroot.md").expect("Failed to create file");
+    let mut file = File::create("../benchmark_results/nova_scalar_mul.md").expect("Failed to create file");
     writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
     writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (i, (num_iters, duration)) in results.iter().enumerate() {
@@ -102,9 +89,9 @@ fn bench_nova_ivc(c: &mut Criterion) {
     }
 }
 
-fn minroot_nova(c: &mut Criterion) {
+fn scalar_mul_nova(c: &mut Criterion) {
     bench_nova_ivc(c);
 }
 
-criterion_group!(benches, minroot_nova);
+criterion_group!(benches, scalar_mul_nova);
 criterion_main!(benches);

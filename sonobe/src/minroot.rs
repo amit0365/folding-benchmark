@@ -20,15 +20,17 @@ use folding_schemes::{
 
 #[derive(Clone, Debug)]
 pub struct MinRootIteration<F: PrimeField> {
+  pub i: F,
   pub x_i: F,
   pub y_i: F,
+  pub i_plus_1: F,
   pub x_i_plus_1: F,
   pub y_i_plus_1: F,
 }
 
 impl<F: PrimeField> MinRootIteration<F> {
   // produces a sample non-deterministic advice, executing one invocation of MinRoot per step
-  fn new(num_iters: usize, x_0: &F, y_0: &F) -> (Vec<F>, Vec<Self>) {
+  fn new(num_iters: usize, i_0: &F, x_0: &F, y_0: &F) -> (Vec<F>, Vec<Self>) {
     // exp = (p - 3 / 5), where p is the order of the group
     // x^{exp} mod p provides the fifth root of x
     let exp = {
@@ -41,6 +43,7 @@ impl<F: PrimeField> MinRootIteration<F> {
     };
 
     let mut res = Vec::new();
+    let mut i = *i_0;
     let mut x_i = *x_0;
     let mut y_i = *y_0;
     for _i in 0..num_iters {
@@ -54,20 +57,24 @@ impl<F: PrimeField> MinRootIteration<F> {
         assert_eq!(fifth, x_i + y_i);
       }
 
-      let y_i_plus_1 = x_i;
+      let y_i_plus_1 = x_i + i;
+      let i_plus_1 = i + F::ONE;
 
       res.push(Self {
         x_i,
         y_i,
         x_i_plus_1,
         y_i_plus_1,
+        i,
+        i_plus_1,
       });
 
       x_i = x_i_plus_1;
       y_i = y_i_plus_1;
+      i = i_plus_1;
     }
 
-    let z0 = vec![*x_0, *y_0];
+    let z0 = vec![*i_0, *x_0, *y_0];
 
     (z0, res)
   }
@@ -84,7 +91,7 @@ pub struct MinRootCircuit<F: PrimeField> {
 impl<F: PrimeField> MinRootCircuit<F> {
     pub fn new(initial_input: Vec<F>, num_iters_per_step: usize) -> Self {
         let (_output, seq) = 
-            MinRootIteration::new(num_iters_per_step, &initial_input[0], &initial_input[1]);
+            MinRootIteration::new(num_iters_per_step, &initial_input[0], &initial_input[1], &initial_input[2]);
 
         Self { 
             num_iters_per_step,
@@ -100,7 +107,7 @@ impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
   
   fn new(params: Self::Params) -> Self {
     let (_output, seq) = 
-    MinRootIteration::new(params.1, &params.0[0], &params.0[1]);
+    MinRootIteration::new(params.1, &params.0[0], &params.0[1], &params.0[2]);
 
     Self { 
         num_iters_per_step: params.1,
@@ -110,28 +117,31 @@ impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
   }
 
   fn state_len(&self) -> usize {
-      2
+      3
   }
 
   fn step_native(&mut self, _i: usize, _z_i: Vec<F>) -> Result<Vec<F>, Error> {
         // produces a sample non-deterministic advice, executing one invocation of MinRoot per step
         let (_output, seq) = 
-        MinRootIteration::new(self.num_iters_per_step, &self.input[0], &self.input[1]);
+        MinRootIteration::new(self.num_iters_per_step, &self.input[0], &self.input[1], &self.input[2]);
   
         self.seq = seq;
   
         // use the provided inputs
-        let x_0 = self.input[0];
-        let y_0 = self.input[1];
+        let i_0 = self.input[0];
+        let x_0 = self.input[1];
+        let y_0 = self.input[2];
         let mut z_out: Vec<F> = Vec::new();
   
         // variables to hold running x_i and y_i
         let mut x_i = x_0;
         let mut y_i = y_0;
-        for i in 0..self.seq.len() {
+        let mut i = i_0;
+        for ii in 0..self.seq.len() {
         // non deterministic advice
-        let x_i_plus_1 = self.seq[i].x_i_plus_1;
-  
+        let i_plus_1 = self.seq[ii].i_plus_1;
+        let x_i_plus_1 = self.seq[ii].x_i_plus_1;
+        let y_i_plus_1 = self.seq[ii].y_i_plus_1;
         // check the following conditions hold:
         // (i) x_i_plus_1 = (x_i + y_i)^{1/5}, which can be more easily checked with x_i_plus_1^5 = x_i + y_i
         // (ii) y_i_plus_1 = x_i
@@ -139,13 +149,17 @@ impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
         let x_i_plus_1_quad = x_i_plus_1_sq * x_i_plus_1_sq;
         assert_eq!(x_i_plus_1_quad * x_i_plus_1, x_i + y_i);
 
-        if i == self.seq.len() - 1 {
-            z_out = vec![x_i_plus_1, x_i];
+        assert_eq!(y_i_plus_1, x_i + i);
+        assert_eq!(i_plus_1, i + F::ONE);
+
+        if ii == self.seq.len() - 1 {
+            z_out = vec![i_plus_1, x_i_plus_1, y_i_plus_1];
         }
   
-            // update x_i and y_i for the next iteration
-            y_i = x_i;
+            // update i, x_i and y_i for the next iteration
+            y_i = y_i_plus_1;
             x_i = x_i_plus_1;
+            i = i_plus_1;
         }
   
       Ok(z_out)
@@ -162,16 +176,25 @@ impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
       Err(SynthesisError::AssignmentMissing);
 
     // use the provided inputs
-    let x_0 = z_i[0].clone();
-    let y_0 = z_i[1].clone();
+    let i_0 = z_i[0].clone();
+    let x_0 = z_i[1].clone();
+    let y_0 = z_i[2].clone();
 
     // variables to hold running x_i and y_i
+
     let mut x_i = x_0;
     let mut y_i = y_0;
-    for i in 0..self.seq.len() {
+    let mut i = i_0;
+    for ii in 0..self.seq.len() {
       // non deterministic advice
+      let i_plus_1 = FpVar::new_variable(cs.clone(),
+       || Ok(self.seq[ii].i_plus_1), AllocationMode::Witness).unwrap();
+
       let x_i_plus_1 = FpVar::new_variable(cs.clone(),
-       || Ok(self.seq[i].x_i_plus_1), AllocationMode::Constant).unwrap();
+       || Ok(self.seq[ii].x_i_plus_1), AllocationMode::Witness).unwrap();
+      
+      let y_i_plus_1 = FpVar::new_variable(cs.clone(),
+       || Ok(self.seq[ii].y_i_plus_1), AllocationMode::Witness).unwrap();
       
       // check the following conditions hold:
       // (i) x_i_plus_1 = (x_i + y_i)^{1/5}, which can be more easily checked with x_i_plus_1^5 = x_i + y_i
@@ -184,14 +207,17 @@ impl<F: PrimeField> FCircuit<F> for MinRootCircuit<F> {
 
       let x_i_plus_1_fifth: FpVar::<F> = x_i_plus_1_quad * x_i_plus_1.clone();
       x_i_plus_1_fifth.conditional_enforce_equal(&(&x_i + &y_i), &Boolean::<F>::TRUE)?;
+      i_plus_1.conditional_enforce_equal(&(i.clone() + F::ONE), &Boolean::<F>::TRUE)?;
+      y_i_plus_1.conditional_enforce_equal(&(x_i.clone() + i.clone()), &Boolean::<F>::TRUE)?;
 
-      if i == self.seq.len() - 1 {
-        z_out = Ok(vec![x_i_plus_1.clone(), x_i.clone()]);
+      if ii == self.seq.len() - 1 {
+        z_out = Ok(vec![i_plus_1.clone(), x_i_plus_1.clone(), y_i_plus_1.clone()]);
       }
 
       // update x_i and y_i for the next iteration
-      y_i = x_i;
+      y_i = y_i_plus_1;
       x_i = x_i_plus_1;
+      i = i_plus_1;
     }
 
     z_out

@@ -1,0 +1,13 @@
+[package]
+name = "custom_cyclefold"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+halo2_proofs = { git = "https://github.com/amit0365/halo2", branch = "protostar-acc_u"}
+plonkish_backend = { git = "https://github.com/amit0365/plonkish.git" , branch = "with_u"}
+criterion = "0.4"
+
+[[bench]]
+name = "minroot"
+harness = false 
