@@ -7,7 +7,7 @@ use criterion::BenchmarkId;
 use std::collections::HashMap;
 use plonkish_backend::util::test::seeded_std_rng;
 use halo2_proofs::halo2curves::{bn256::{self, Bn256}, grumpkin};
-use plonkish_backend::accumulation::protostar::ivc::halo2::test::{run_protostar_hyperplonk_ivc_minroot_preprocess, run_protostar_hyperplonk_ivc_prove};
+use plonkish_backend::accumulation::protostar::ivc::halo2::test::{run_protostar_hyperplonk_ivc_smchain_preprocess, run_protostar_hyperplonk_ivc_prove};
 use criterion::{criterion_group, criterion_main, Criterion};
 use plonkish_backend::pcs::multilinear::{Gemini, MultilinearIpa};
 use plonkish_backend::pcs::univariate::UnivariateKzg;
@@ -15,8 +15,8 @@ use plonkish_backend::pcs::PolynomialCommitmentScheme;
 
 fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
     let num_steps = 10;
-    let num_iters_steps = vec![1000, 9000, 25000, 58000, 100000];
-    let num_vars = vec![12, 13, 14, 15, 16];
+    let num_iters_steps = vec![95, 225, 475, 975, 1975];
+    let num_vars = vec![14, 15, 16, 17, 18];
     let (mut primary_circuits, mut secondary_circuits, mut pp_vec, mut vp_vec) 
         = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     
@@ -27,7 +27,7 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
         let cyclefold_params = MultilinearIpa::setup(1 << (cyclefold_num_vars + 4), 0, &mut seeded_std_rng()).unwrap();
 
         let (primary_circuit, secondary_circuit, ivc_pp, ivc_vp)
-            = run_protostar_hyperplonk_ivc_minroot_preprocess::<
+            = run_protostar_hyperplonk_ivc_smchain_preprocess::<
                 bn256::G1Affine,
                 Gemini<UnivariateKzg<Bn256>>,
                 MultilinearIpa<grumpkin::G1Affine>,
@@ -69,7 +69,7 @@ fn bench_gemini_kzg_ipa_protostar_hyperplonk_ivc(c: &mut Criterion) {
 
     group.finish();
 
-    let mut file = File::create("../../benchmark_results/halo2_minroot_custom_cyclefold_best2.md").expect("Failed to create file");
+    let mut file = File::create("../../benchmark_results/halo2_smchain_custom_cyclefold2.md").expect("Failed to create file");
     writeln!(file, "| Num Steps  | Num Vars  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
     writeln!(file, "|------------|-----------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (i, (num_iters, duration)) in results.iter().enumerate() {

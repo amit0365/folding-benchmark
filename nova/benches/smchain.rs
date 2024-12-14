@@ -24,7 +24,7 @@ fn bench_nova_ivc(c: &mut Criterion) {
     let mut secondary_circuits = Vec::new();
     let mut pp_vec = Vec::new();
     let num_steps = 10;
-    let num_sm_per_step = vec![64, 128, 256, 512, 1024];
+    let num_sm_per_step = vec![95, 225, 475, 975, 1975];
     for num_sm_per_step in &num_sm_per_step {
       let circuit_primary = ScalarMulChainCircuit::new(*num_sm_per_step);
       let circuit_secondary = TrivialCircuit::default();
@@ -78,13 +78,13 @@ fn bench_nova_ivc(c: &mut Criterion) {
     group.finish();
 
     let mut file = File::create("../benchmark_results/nova_scalar_mul.md").expect("Failed to create file");
-    writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
+    writeln!(file, "| Num Steps  | K | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
     writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (i, (num_iters, duration)) in results.iter().enumerate() {
         writeln!(
             file,
             "| {}         | {}               | {:?} ms             | {:?}                | {:?}                  |",
-            num_steps, num_iters, duration, pp_vec[i].num_constraints().0, pp_vec[i].num_constraints().1
+            num_steps, pp_vec[i].ck_log2_len().0, duration, pp_vec[i].num_constraints().0, pp_vec[i].num_constraints().1
         ).expect("Failed to write to file");
     }
 }

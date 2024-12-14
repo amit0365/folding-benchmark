@@ -30,5 +30,5 @@ name = "hashchain"
 harness = false 
 
 [[bench]]
-name = "scalar_mul"
+name = "smchain"
 harness = false 

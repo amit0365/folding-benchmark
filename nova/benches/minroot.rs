@@ -23,7 +23,7 @@ fn bench_nova_ivc(c: &mut Criterion) {
     let mut primary_circuits = Vec::new();
     let mut secondary_circuits = Vec::new();
     let mut pp_vec = Vec::new();
-    let num_iters_per_step = vec![1024, 2048, 4096, 8192, 16384, 32768, 65535];
+    let num_iters_per_step = vec![1000, 9000, 25000, 58000, 100000];
     for num_iters in &num_iters_per_step {
       let circuit_primary = MinRootCircuit {
           seq: vec![
@@ -52,7 +52,7 @@ fn bench_nova_ivc(c: &mut Criterion) {
       &*S2::ck_floor(),
       )
       .unwrap();
-    
+
       pp_vec.push(pp);
       primary_circuits.push(circuit_primary);
       secondary_circuits.push(circuit_secondary);
@@ -90,14 +90,14 @@ fn bench_nova_ivc(c: &mut Criterion) {
 
     group.finish();
 
-    let mut file = File::create("../benchmark_results/nova_minroot.md").expect("Failed to create file");
-    writeln!(file, "| Num Steps  | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
-    writeln!(file, "|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
+    let mut file = File::create("../benchmark_results/nova_minroot_same2.md").expect("Failed to create file");
+    writeln!(file, "| Num Steps  |     K      | Num Iters per step | Execution Time (ms) | Primary_circuit_size | Secondary_circuit_size |").expect("Failed to write to file");
+    writeln!(file, "|------------|------------|--------------------|---------------------|----------------------|------------------------|").expect("Failed to write to file");
     for (i, (num_iters, duration)) in results.iter().enumerate() {
         writeln!(
             file,
-            "| {}         | {}               | {:?} ms             | {:?}                | {:?}                  |",
-            num_steps, num_iters, duration, pp_vec[i].num_constraints().0, pp_vec[i].num_constraints().1
+            "| {}         | {}         | {}               | {:?} ms             | {:?}                | {:?}                  |",
+            num_steps, pp_vec[i].ck_log2_len().0, num_iters, duration, pp_vec[i].num_constraints().0, pp_vec[i].num_constraints().1
         ).expect("Failed to write to file");
     }
 }

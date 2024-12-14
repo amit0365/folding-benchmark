@@ -24,7 +24,7 @@ fn bench_nova_ivc(c: &mut Criterion) {
     let mut secondary_circuits = Vec::new();
     let mut pp_vec = Vec::new();
     let num_steps = 10;
-    let num_elts_per_step = vec![1024, 2048, 4096, 8192, 16384];
+    let num_elts_per_step = vec![1400, 3200, 6600, 14000, 28000];
     for num_elts_per_step in &num_elts_per_step {
       let circuit_primary = HashChainCircuit::new(*num_elts_per_step);
 

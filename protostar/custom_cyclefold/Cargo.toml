@@ -11,3 +11,11 @@ criterion = "0.4"
 [[bench]]
 name = "minroot"
 harness = false 
+
+[[bench]]
+name = "hashchain"
+harness = false 
+
+[[bench]]
+name = "smchain"
+harness = false 
